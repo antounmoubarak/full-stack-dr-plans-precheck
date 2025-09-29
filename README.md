@@ -1,6 +1,6 @@
 # Full Stack Disaster Recovery - DR Plans Precheck Tool
 
-This tool performs prechecks on all active Disaster Recovery (DR) plans in a given OCI Disaster Recovery Protection Group (DRPG).
+This tool performs prechecks on all active Disaster Recovery (DR) plans in a given OCI Disaster Recovery Protection Group (DRPG) to ensure system readiness and reliability.
 
 ## Requirements
 
