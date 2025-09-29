@@ -275,7 +275,7 @@ def run_prechecks(drpg_ocid: str, topic_ocid: str, base_dir: Path):
 # === Entry Point === #
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Run prechecks on all DR plans for a given OCI DRPG."
+        description="Run prechecks on all Active DR plans for a given OCI DRPG."
     )
     parser.add_argument("-id", "--drpg-ocid", required=True, help="DRPG OCID")
     parser.add_argument("-nf", "--ons-topic-ocid", help="Notification Topic OCID")
