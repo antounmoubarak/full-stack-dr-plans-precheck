@@ -125,7 +125,7 @@ def list_active_dr_plans(drpg_ocid, client, logger):
     for plan in all_dr_plans.data.items:
         if plan.lifecycle_state in transitional_states:
             logging.error(f"Plan {plan.display_name} is in {plan.lifecycle_state} state")
-            return None
+            sys.exit(1)
     try:
         return client.list_dr_plans(drpg_ocid, lifecycle_state="ACTIVE")
     except Exception as e:
