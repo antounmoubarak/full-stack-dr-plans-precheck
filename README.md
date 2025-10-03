@@ -11,7 +11,7 @@ This tool performs prechecks on all active Disaster Recovery (DR) plans in a giv
 ## Usage
 
 ```bash
-full-stack-dr-plans-precheck.py -id DRPG_OCID [-nf ONS_TOPIC_OCID]
+full_stack_dr_plans_precheck.py -id DRPG_OCID [-nf ONS_TOPIC_OCID]
 
 arguments:
   -id DRPG_OCID, --drpg-ocid DRPG_OCID
