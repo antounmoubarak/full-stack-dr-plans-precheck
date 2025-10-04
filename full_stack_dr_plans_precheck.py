@@ -263,7 +263,7 @@ def run_prechecks(drpg_ocid: str, topic_ocid: str, base_dir: Path):
         sys.exit(1)
     
     if isinstance(dr_plans, str):
-        logger.erro(f"First transitional state found: {dr_plans}")
+        logger.error(f"First transitional state found: {dr_plans}")
         if topic_ocid:
             region_file.unlink()
             send_notification(signer, standby_name, standby_ocid, topic_ocid, error_log, base_dir, logger)
