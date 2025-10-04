@@ -255,6 +255,13 @@ def run_prechecks(drpg_ocid: str, topic_ocid: str, base_dir: Path):
 
     dr_plans = list_active_dr_plans(standby_ocid, dr_client, logger)
 
+    if len(dr_plans) == 0:
+        logger.error(f"No Active DR plans found in {standby_name}.")
+        if topic_ocid:
+            region_file.unlink()
+            send_notification(signer, standby_name, standby_ocid, topic_ocid, error_log, base_dir, logger)
+        sys.exit(1)
+    
     if isinstance(dr_plans, str):
         logger.erro(f"First transitional state found: {dr_plans}")
         if topic_ocid:
@@ -265,7 +272,7 @@ def run_prechecks(drpg_ocid: str, topic_ocid: str, base_dir: Path):
         for plan in dr_plans:
             plan_type = DrPlanType(plan.type)
             logger.info(f"Running precheck for {plan_type.value} plan: {plan.display_name}")
-    
+
             if plan_type == DrPlanType.SWITCHOVER:
                 options = oci.disaster_recovery.models.SwitchoverPrecheckExecutionOptionDetails()
             elif plan_type == DrPlanType.FAILOVER:
@@ -277,36 +284,30 @@ def run_prechecks(drpg_ocid: str, topic_ocid: str, base_dir: Path):
             else:
                 logger.error(f"Unknown plan type: {plan.type}")
                 sys.exit(1)
-    
+
             execution = dr_client.create_dr_plan_execution(
                 oci.disaster_recovery.models.CreateDrPlanExecutionDetails(
                     plan_id=plan.id,
                     execution_options=options
                 )
             )
-    
+
             oci.wait_until(dr_client, dr_client.get_dr_plan_execution(execution.data.id), 'lifecycle_state', 'IN_PROGRESS')
             oci.wait_until(dr_client, get_drpg_details(standby_ocid, dr_client, logger), 'lifecycle_state', 'ACTIVE')
             final_status = dr_client.get_dr_plan_execution(execution.data.id)
-    
+
             if final_status.data.lifecycle_state == "SUCCEEDED":
                 logger.info(f"Precheck passed: {plan.display_name}")
             else:
                 logger.error(f"Precheck failed: {plan.display_name}")
-    
+
         if error_log.exists() and error_log.stat().st_size > 0 and topic_ocid:
             send_notification(signer, standby_name, standby_ocid, topic_ocid, error_log, base_dir, logger)
-    
+
         if region_file.exists():
             region_file.unlink()
         if error_log.exists():
-            error_log.unlink()   
-    else:
-        logger.error(f"No Active DR plans found in {standby_name}.")
-        if topic_ocid:
-            region_file.unlink()
-            send_notification(signer, standby_name, standby_ocid, topic_ocid, error_log, base_dir, logger)
-        sys.exit(1)
+            error_log.unlink()
 
 # === Entry Point === #
 if __name__ == "__main__":
