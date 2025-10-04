@@ -248,8 +248,8 @@ def run_prechecks(drpg_ocid: str, topic_ocid: str, base_dir: Path):
 
     if standby_state != "ACTIVE":
         logger.error(f"Standby DRPG is not active.")
+        region_file.unlink()
         if topic_ocid:
-            region_file.unlink()
             send_notification(signer, standby_name, standby_ocid, topic_ocid, error_log, base_dir, logger)
         sys.exit(1)
 
@@ -257,15 +257,15 @@ def run_prechecks(drpg_ocid: str, topic_ocid: str, base_dir: Path):
 
     if len(dr_plans) == 0:
         logger.error(f"No Active DR plans found in {standby_name}.")
+        region_file.unlink()
         if topic_ocid:
-            region_file.unlink()
             send_notification(signer, standby_name, standby_ocid, topic_ocid, error_log, base_dir, logger)
         sys.exit(1)
     
     if isinstance(dr_plans, str):
         logger.error(f"First transitional state found: {dr_plans}")
+        region_file.unlink()
         if topic_ocid:
-            region_file.unlink()
             send_notification(signer, standby_name, standby_ocid, topic_ocid, error_log, base_dir, logger)
         sys.exit(1)
     elif isinstance(dr_plans, list):
