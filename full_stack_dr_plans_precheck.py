@@ -139,7 +139,7 @@ def list_active_dr_plans(drpg_ocid, client, logger):
         all_dr_plans = client.list_dr_plans(drpg_ocid)
         for plan in all_dr_plans.data.items:
             if plan.lifecycle_state in transitional_states:
-                logger.error(f"Found transitional plan: {plan.display_name} in state {plan.lifecycle_state}")
+                logger.error(f"Found transitional state for plan: {plan.display_name} in state {plan.lifecycle_state}")
                 return plan.lifecycle_state
 
         # No transitional plans found, fetch ACTIVE ones
