@@ -119,19 +119,37 @@ def get_drpg_details(drpg_ocid, client, logger):
     return None
 
 
+#def list_active_dr_plans(drpg_ocid, client, logger):
+#    transitional_states = {"CREATING", "UPDATING", "DELETING"}
+#    all_dr_plans = client.list_dr_plans(drpg_ocid)
+#    for plan in all_dr_plans.data.items:
+#        if plan.lifecycle_state in transitional_states:
+#            logger.error(f"Plan {plan.display_name} is in {plan.lifecycle_state} state", exc_info=True)
+#            sys.exit(1)
+#    try:
+#        return client.list_dr_plans(drpg_ocid, lifecycle_state="ACTIVE")
+#    except Exception as e:
+#        logger.error(f"Failed to list DR plans: {str(e)}", exc_info=True)
+#    return None
+
 def list_active_dr_plans(drpg_ocid, client, logger):
     transitional_states = {"CREATING", "UPDATING", "DELETING"}
-    all_dr_plans = client.list_dr_plans(drpg_ocid)
-    for plan in all_dr_plans.data.items:
-        if plan.lifecycle_state in transitional_states:
-            logging.error(f"Plan {plan.display_name} is in {plan.lifecycle_state} state", exc_info=True)
-            sys.exit(1)
+
     try:
-        return client.list_dr_plans(drpg_ocid, lifecycle_state="ACTIVE")
+        all_dr_plans = client.list_dr_plans(drpg_ocid)
+        for plan in all_dr_plans.data.items:
+            if plan.lifecycle_state in transitional_states:
+                logger.error(f"Found transitional plan: {plan.display_name} in state {plan.lifecycle_state}")
+                return plan.lifecycle_state
+
+        # No transitional plans found, fetch ACTIVE ones
+        active_plans = client.list_dr_plans(drpg_ocid, lifecycle_state="ACTIVE")
+        logger.info(f"Found {len(active_plans.data.items)} active DR plans.")
+        return active_plans.data.items  # Return list of active plans
+
     except Exception as e:
         logger.error(f"Failed to list DR plans: {str(e)}", exc_info=True)
-    return None
-
+        return None
 
 def send_notification(signer, drpg_name, drpg_ocid, topic_ocid, error_log, base_dir: Path, logger):
     try:
@@ -229,7 +247,7 @@ def run_prechecks(drpg_ocid: str, topic_ocid: str, base_dir: Path):
     logger.info(f"Standby DRPG: {standby_name} ({standby_ocid}) is {standby_state}")
 
     if standby_state != "ACTIVE":
-        logger.error("Standby DRPG is not active.")
+        logger.error(f"Standby DRPG is not active.")
         if topic_ocid:
             region_file.unlink()
             send_notification(signer, standby_name, standby_ocid, topic_ocid, error_log, base_dir, logger)
@@ -237,46 +255,58 @@ def run_prechecks(drpg_ocid: str, topic_ocid: str, base_dir: Path):
 
     dr_plans = list_active_dr_plans(standby_ocid, dr_client, logger)
 
-    for plan in dr_plans.data.items:
-        plan_type = DrPlanType(plan.type)
-        logger.info(f"Running precheck for {plan_type.value} plan: {plan.display_name}")
-
-        if plan_type == DrPlanType.SWITCHOVER:
-            options = oci.disaster_recovery.models.SwitchoverPrecheckExecutionOptionDetails()
-        elif plan_type == DrPlanType.FAILOVER:
-            options = oci.disaster_recovery.models.FailoverPrecheckExecutionOptionDetails()
-        elif plan_type == DrPlanType.START_DRILL:
-            options = oci.disaster_recovery.models.StartDrillPrecheckExecutionOptionDetails()
-        elif plan_type == DrPlanType.STOP_DRILL:
-            options = oci.disaster_recovery.models.StopDrillPrecheckExecutionOptionDetails()
-        else:
-            logger.error(f"Unknown plan type: {plan.type}")
-            sys.exit(1)
-
-        execution = dr_client.create_dr_plan_execution(
-            oci.disaster_recovery.models.CreateDrPlanExecutionDetails(
-                plan_id=plan.id,
-                execution_options=options
+    if isinstance(dr_plans, str):
+        logger.erro(f"First transitional state found: {dr_plans}")
+        if topic_ocid:
+            region_file.unlink()
+            send_notification(signer, standby_name, standby_ocid, topic_ocid, error_log, base_dir, logger)
+        sys.exit(1)
+    elif isinstance(dr_plans, list):
+        for plan in dr_plans:
+            plan_type = DrPlanType(plan.type)
+            logger.info(f"Running precheck for {plan_type.value} plan: {plan.display_name}")
+    
+            if plan_type == DrPlanType.SWITCHOVER:
+                options = oci.disaster_recovery.models.SwitchoverPrecheckExecutionOptionDetails()
+            elif plan_type == DrPlanType.FAILOVER:
+                options = oci.disaster_recovery.models.FailoverPrecheckExecutionOptionDetails()
+            elif plan_type == DrPlanType.START_DRILL:
+                options = oci.disaster_recovery.models.StartDrillPrecheckExecutionOptionDetails()
+            elif plan_type == DrPlanType.STOP_DRILL:
+                options = oci.disaster_recovery.models.StopDrillPrecheckExecutionOptionDetails()
+            else:
+                logger.error(f"Unknown plan type: {plan.type}")
+                sys.exit(1)
+    
+            execution = dr_client.create_dr_plan_execution(
+                oci.disaster_recovery.models.CreateDrPlanExecutionDetails(
+                    plan_id=plan.id,
+                    execution_options=options
+                )
             )
-        )
-
-        oci.wait_until(dr_client, dr_client.get_dr_plan_execution(execution.data.id), 'lifecycle_state', 'IN_PROGRESS')
-        oci.wait_until(dr_client, get_drpg_details(standby_ocid, dr_client, logger), 'lifecycle_state', 'ACTIVE')
-        final_status = dr_client.get_dr_plan_execution(execution.data.id)
-
-        if final_status.data.lifecycle_state == "SUCCEEDED":
-            logger.info(f"Precheck passed: {plan.display_name}")
-        else:
-            logger.error(f"Precheck failed: {plan.display_name}")
-
-    if error_log.exists() and error_log.stat().st_size > 0 and topic_ocid:
-        send_notification(signer, standby_name, standby_ocid, topic_ocid, error_log, base_dir, logger)
-
-    if region_file.exists():
-        region_file.unlink()
-    if error_log.exists():
-        error_log.unlink()
-
+    
+            oci.wait_until(dr_client, dr_client.get_dr_plan_execution(execution.data.id), 'lifecycle_state', 'IN_PROGRESS')
+            oci.wait_until(dr_client, get_drpg_details(standby_ocid, dr_client, logger), 'lifecycle_state', 'ACTIVE')
+            final_status = dr_client.get_dr_plan_execution(execution.data.id)
+    
+            if final_status.data.lifecycle_state == "SUCCEEDED":
+                logger.info(f"Precheck passed: {plan.display_name}")
+            else:
+                logger.error(f"Precheck failed: {plan.display_name}")
+    
+        if error_log.exists() and error_log.stat().st_size > 0 and topic_ocid:
+            send_notification(signer, standby_name, standby_ocid, topic_ocid, error_log, base_dir, logger)
+    
+        if region_file.exists():
+            region_file.unlink()
+        if error_log.exists():
+            error_log.unlink()   
+    else:
+        logger.error(f"No Active DR plans found in {standby_name}.")
+        if topic_ocid:
+            region_file.unlink()
+            send_notification(signer, standby_name, standby_ocid, topic_ocid, error_log, base_dir, logger)
+        sys.exit(1)
 
 # === Entry Point === #
 if __name__ == "__main__":
