@@ -139,7 +139,8 @@ def list_active_dr_plans(drpg_ocid, client, logger):
         all_dr_plans = client.list_dr_plans(drpg_ocid)
         for plan in all_dr_plans.data.items:
             if plan.lifecycle_state in transitional_states:
-                return plan
+                logger.error(f"Found transitional plan: {plan.display_name} in state {plan.lifecycle_state}")
+                return plan.lifecycle_state
 
         # No transitional plans found, fetch ACTIVE ones
         active_plans = client.list_dr_plans(drpg_ocid, lifecycle_state="ACTIVE")
@@ -262,7 +263,6 @@ def run_prechecks(drpg_ocid: str, topic_ocid: str, base_dir: Path):
         sys.exit(1)
     
     if isinstance(dr_plans, str):
-        logger.error(f"Found transitional plan: {dr_plans.display_name} in state {dr_plans.lifecycle_state}")
         region_file.unlink()
         if topic_ocid:
             send_notification(signer, standby_name, standby_ocid, topic_ocid, error_log, base_dir, logger)
