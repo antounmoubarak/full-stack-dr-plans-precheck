@@ -52,7 +52,7 @@ def setup_logger(drpg_ocid: str, base_dir: Path):
 
     timestamp = time.strftime("%Y%m%d%H%M%S")
     all_log = logs_dir / f"{drpg_ocid}.log"
-    #error_log = logs_dir / f"{drpg_ocid}_{timestamp}_error.log"
+    notification_log = logs_dir / f"{drpg_ocid}_{timestamp}_notification.log"
 
     logger = logging.getLogger("drpg_precheck")
     logger.setLevel(logging.DEBUG)
@@ -69,11 +69,11 @@ def setup_logger(drpg_ocid: str, base_dir: Path):
     fh_all.setLevel(logging.INFO)
     handlers.append(fh_all)
 
-    #fh_error = logging.FileHandler(error_log)
-    #fh_error.setFormatter(formatter)
-    #fh_error.setLevel(logging.ERROR)
-    #fh_error.addFilter(LevelFilter(logging.ERROR))
-    #handlers.append(fh_error)
+    fh_notification = logging.FileHandler(notification_log)
+    fh_notification.setFormatter(formatter)
+    fh_notification.setLevel(logging.INFO)
+    fh_notification.addFilter(LevelFilter(logging.INFO))
+    handlers.append(fh_notification)
 
     ch = logging.StreamHandler()
     ch.setFormatter(formatter)
@@ -85,9 +85,7 @@ def setup_logger(drpg_ocid: str, base_dir: Path):
     for h in handlers:
         logger.addHandler(h)
 
-    #return logger, error_log
-    return logger, all_log
-
+    return logger, notification_log
 
 # === Utility Functions === #
 def is_valid_ocid(ocid: str, pattern: Pattern) -> bool:
@@ -166,26 +164,25 @@ def send_notification(signer, drpg_name, drpg_ocid, topic_ocid, log, base_dir: P
 
 # === Main Logic === #
 def run_prechecks(drpg_ocid: str, topic_ocid: str, base_dir: Path):
-    #logger, error_log = setup_logger(drpg_ocid, base_dir)
-    logger, all_log = setup_logger(drpg_ocid, base_dir)
+    logger, notification_log = setup_logger(drpg_ocid, base_dir)
 
     if not is_valid_ocid(drpg_ocid, DRPG_OCID_PATTERN):
         logger.error(f"Invalid DRPG OCID format: {drpg_ocid}")
         if topic_ocid:
-            send_notification(signer, "", drpg_ocid, topic_ocid, all_log, base_dir, logger)
+            send_notification(signer, "", drpg_ocid, topic_ocid, notification_log, base_dir, logger)
         sys.exit(1)
 
     if topic_ocid and not is_valid_ocid(topic_ocid, TOPIC_OCID_PATTERN):
         logger.error(f"Invalid Notification Topic OCID format: {topic_ocid}")
         if topic_ocid:
-            send_notification(signer, "", drpg_ocid, topic_ocid, all_log, base_dir, logger)
+            send_notification(signer, "", drpg_ocid, topic_ocid, notification_log, base_dir, logger)
         sys.exit(1)
 
     region = normalize_region(drpg_ocid.split('.')[3])
     if not region:
         logger.error("Unable to determine region for DRPG.")
         if topic_ocid:
-            send_notification(signer, "", drpg_ocid, topic_ocid, all_log, base_dir, logger)
+            send_notification(signer, "", drpg_ocid, topic_ocid, notification_log, base_dir, logger)
         sys.exit(1)
 
     region_file = prepare_region_file(region, base_dir, drpg_ocid)
@@ -197,7 +194,7 @@ def run_prechecks(drpg_ocid: str, topic_ocid: str, base_dir: Path):
     if not drpg:
         region_file.unlink()
         if topic_ocid:
-            send_notification(signer, "", drpg_ocid, topic_ocid, all_log, base_dir, logger)
+            send_notification(signer, "", drpg_ocid, topic_ocid, notification_log, base_dir, logger)
         sys.exit(1)
 
     role = drpg.data.role
@@ -208,7 +205,7 @@ def run_prechecks(drpg_ocid: str, topic_ocid: str, base_dir: Path):
         logger.error("DRPG is unconfigured.")
         region_file.unlink()
         if topic_ocid:
-            send_notification(signer, drpg.data.display_name, drpg_ocid, topic_ocid, all_log, base_dir, logger)
+            send_notification(signer, drpg.data.display_name, drpg_ocid, topic_ocid, notification_log, base_dir, logger)
         sys.exit(1)
 
     if role == "PRIMARY":
@@ -227,7 +224,7 @@ def run_prechecks(drpg_ocid: str, topic_ocid: str, base_dir: Path):
             logger.error("Failed to get peer DRPG details.")
             region_file.unlink()
             if topic_ocid:
-                send_notification(signer, "", peer_ocid, topic_ocid, all_log, base_dir, logger)
+                send_notification(signer, "", peer_ocid, topic_ocid, notification_log, base_dir, logger)
             sys.exit(1)
 
     standby_ocid = drpg.data.id
@@ -240,7 +237,7 @@ def run_prechecks(drpg_ocid: str, topic_ocid: str, base_dir: Path):
         logger.error(f"Standby DRPG is not active.")
         region_file.unlink()
         if topic_ocid:
-            send_notification(signer, standby_name, standby_ocid, topic_ocid, all_log, base_dir, logger)
+            send_notification(signer, standby_name, standby_ocid, topic_ocid, notification_log, base_dir, logger)
         sys.exit(1)
 
     dr_plans = list_active_dr_plans(standby_ocid, dr_client, logger)
@@ -249,13 +246,13 @@ def run_prechecks(drpg_ocid: str, topic_ocid: str, base_dir: Path):
         logger.error(f"No Active DR plans found in {standby_name}.")
         region_file.unlink()
         if topic_ocid:
-            send_notification(signer, standby_name, standby_ocid, topic_ocid, all_log, base_dir, logger)
+            send_notification(signer, standby_name, standby_ocid, topic_ocid, notification_log, base_dir, logger)
         sys.exit(1)
     
     if isinstance(dr_plans, str):
         region_file.unlink()
         if topic_ocid:
-            send_notification(signer, standby_name, standby_ocid, topic_ocid, all_log, base_dir, logger)
+            send_notification(signer, standby_name, standby_ocid, topic_ocid, notification_log, base_dir, logger)
         sys.exit(1)
     elif isinstance(dr_plans, list):
         for plan in dr_plans:
@@ -290,14 +287,13 @@ def run_prechecks(drpg_ocid: str, topic_ocid: str, base_dir: Path):
             else:
                 logger.error(f"Precheck failed: {plan.display_name}")
 
-        #if error_log.exists() and error_log.stat().st_size > 0 and topic_ocid:
-        if topic_ocid:
-            send_notification(signer, standby_name, standby_ocid, topic_ocid, all_log, base_dir, logger)
+        if notification_log.exists() and notification_log.stat().st_size > 0 and topic_ocid:
+            send_notification(signer, standby_name, standby_ocid, topic_ocid, notification_log, base_dir, logger)
 
         if region_file.exists():
             region_file.unlink()
-        #if error_log.exists():
-        #    error_log.unlink()
+        if notification_log.exists():
+            notification_log.unlink()
 
 # === Entry Point === #
 if __name__ == "__main__":
