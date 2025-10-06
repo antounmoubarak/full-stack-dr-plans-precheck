@@ -146,7 +146,7 @@ def send_notification(signer, drpg_name, drpg_ocid, topic_ocid, log, base_dir: P
         config = oci.config.from_file(str(region_file), profile_name="REGION")
         client = oci.ons.NotificationDataPlaneClient(config=config, signer=signer)
 
-        subject = f"FSDR Precheck Failed for {drpg_name} - {drpg_ocid}"
+        subject = f"FSDR Precheck Results for {drpg_name} - {drpg_ocid}"
 
         client.publish_message(
             topic_id=topic_ocid,
