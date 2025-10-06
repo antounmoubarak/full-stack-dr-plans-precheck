@@ -72,7 +72,7 @@ def setup_logger(drpg_ocid: str, base_dir: Path):
     fh_notification = logging.FileHandler(notification_log)
     fh_notification.setFormatter(formatter)
     fh_notification.setLevel(logging.INFO)
-    fh_notification.addFilter(LevelFilter(logging.INFO))
+#    fh_notification.addFilter(LevelFilter(logging.INFO))
     handlers.append(fh_notification)
 
     ch = logging.StreamHandler()
