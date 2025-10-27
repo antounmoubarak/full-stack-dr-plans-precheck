@@ -233,7 +233,8 @@ def run_prechecks(drpg_ocid: str, topic_ocid: str, base_dir: Path):
 
     logger.info(f"Standby DRPG: {standby_name} ({standby_ocid}) is {standby_state}")
 
-    if standby_state != "ACTIVE":
+#    if standby_state != "ACTIVE":
+    if standby_state not in ("ACTIVE", "INACTIVE"):
         logger.error(f"Standby DRPG is not active.")
         region_file.unlink()
         if topic_ocid:
@@ -279,7 +280,7 @@ def run_prechecks(drpg_ocid: str, topic_ocid: str, base_dir: Path):
             )
 
             oci.wait_until(dr_client, dr_client.get_dr_plan_execution(execution.data.id), 'lifecycle_state', 'IN_PROGRESS')
-            oci.wait_until(dr_client, get_drpg_details(standby_ocid, dr_client, logger), 'lifecycle_state', 'ACTIVE')
+            oci.wait_until(dr_client, get_drpg_details(standby_ocid, dr_client, logger), 'lifecycle_state', standby_state)
             final_status = dr_client.get_dr_plan_execution(execution.data.id)
 
             if final_status.data.lifecycle_state == "SUCCEEDED":
