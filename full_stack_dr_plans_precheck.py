@@ -235,7 +235,7 @@ def run_prechecks(drpg_ocid: str, topic_ocid: str, base_dir: Path):
 
 #    if standby_state != "ACTIVE":
     if standby_state not in ("ACTIVE", "INACTIVE"):
-        logger.error(f"Standby DRPG is not active.")
+        logger.error(f"Standby DRPG is {standby_state}.")
         region_file.unlink()
         if topic_ocid:
             send_notification(signer, standby_name, standby_ocid, topic_ocid, notification_log, base_dir, logger)
