@@ -233,8 +233,7 @@ def run_prechecks(drpg_ocid: str, topic_ocid: str, base_dir: Path):
 
     logger.info(f"Standby DRPG: {standby_name} ({standby_ocid}) is {standby_state}")
 
-#    if standby_state != "ACTIVE":
-    if standby_state not in ("ACTIVE", "INACTIVE"):
+    if standby_state != "ACTIVE":
         logger.error(f"Standby DRPG is not active.")
         region_file.unlink()
         if topic_ocid:
