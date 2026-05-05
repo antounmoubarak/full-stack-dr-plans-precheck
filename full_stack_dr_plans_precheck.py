@@ -166,6 +166,8 @@ def send_notification(signer, drpg_name, drpg_ocid, topic_ocid, log, base_dir: P
 def run_prechecks(drpg_ocid: str, topic_ocid: str, base_dir: Path):
     logger, notification_log = setup_logger(drpg_ocid, base_dir)
 
+    signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
+
     if not is_valid_ocid(drpg_ocid, DRPG_OCID_PATTERN):
         logger.error(f"Invalid DRPG OCID format: {drpg_ocid}")
         if topic_ocid:
@@ -186,7 +188,6 @@ def run_prechecks(drpg_ocid: str, topic_ocid: str, base_dir: Path):
         sys.exit(1)
 
     region_file = prepare_region_file(region, base_dir, drpg_ocid)
-    signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
     config = oci.config.from_file(str(region_file), profile_name="REGION")
     dr_client = oci.disaster_recovery.DisasterRecoveryClient(config=config, signer=signer)
 
